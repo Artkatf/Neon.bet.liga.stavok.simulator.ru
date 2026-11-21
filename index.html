@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>NEON BET // Симулятор ставок</title>
+<style>
+  :root {
+    --bg-dark: #060913;
+    --bg-card: #0d1326;
+    --bg-panel: #131b36;
+    --neon-cyan: #00f3ff;
+    --neon-green: #05ffa1;
+    --neon-pink: #ff2a6d;
+    --neon-purple: #b967ff;
+    --neon-yellow: #ffe600;
+    --text-main: #ffffff;
+    --text-muted: #8492b4;
+    --border-subtle: rgba(255, 255, 255, 0.08);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+  body { background-color: var(--bg-dark); color: var(--text-main); min-height: 100vh; display: flex; flex-direction: column; }
+
+  /* Мобильные push-уведомления сверху экрана */
+  #nbPushContainer {
+    position: fixed;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 92%;
+    max-width: 420px;
+    z-index: 20000;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    pointer-events: none;
+  }
+  .nb-push-toast {
+    background: rgba(13, 19, 38, 0.96);
+    backdrop-filter: blur(12px);
+    border-radius: 14px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.65);
+    border: 1px solid var(--neon-cyan);
+    animation: slideDownPush 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    pointer-events: auto;
+    cursor: pointer;
+  }
+  .nb-push-toast.win {
+    border-color: var(--neon-green);
+    box-shadow: 0 8px 25px rgba(5, 255, 161, 0.25);
+  }
+  .nb-push-toast.loss {
+    border-color: var(--neon-pink);
+    box-shadow: 0 8px 25px rgba(255, 42, 109, 0.25);
+  }
+  .nb-push-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+  .nb-push-toast.win .nb-push-icon { background: rgba(5, 255, 161, 0.15); }
+  .nb-push-toast.loss .nb-push-icon { background: rgba(255, 42, 109, 0.15); }
+  .nb-push-toast.info .nb-push-icon { background: rgba(0, 243, 255, 0.15); }
+  .nb-push-content { flex: 1; }
+  .nb-push-app {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-muted);
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 2px;
+  }
+  .nb-push-title { font-weight: 700; font-size: 14px; color: #fff; margin-bottom: 2px; }
+  .nb-push-body { font-size: 12px; color: #cbd5e1; line-height: 1.3; }
+  @keyframes slideDownPush {
+    from { opacity: 0; transform: translateY(-30px) scale(0.95); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  @keyframes fadeOutPush {
+    to { opacity: 0; transform: translateY(-20px) scale(0.95); }
+  }
+
+  /* Экран входа/регистрации */
+  #authScreen {
+    flex: 1; display: flex; align-items: center; justify-content: center; padding: 20px;
+  }
+  .auth-box {
+    width: 100%; max-width: 400px; background: var(--bg-card);
+    border: 1px solid var(--neon-cyan); border-radius: 14px; padding: 26px;
+    box-shadow: 0 0 30px rgba(0, 243, 255, 0.15);
+  }
+  .logo {
+    font-size: 26px; font-weight: 900; letter-spacing: 1px; text-align: center;
+    background: linear-gradient(90deg, var(--neon-cyan), var(--neon-purple));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    margin-bottom: 6px;
+  }
+  .auth-sub { text-align: center; font-size: 13px; color: var(--text-muted); margin-bottom: 20px; }
+  .auth-tabs { display: flex; gap: 8px; margin-bottom: 18px; }
+  .auth-tab {
+    flex: 1; padding: 10px; background: var(--bg-panel); border: 1px solid var(--border-subtle);
+    color: var(--text-muted); border-radius: 8px; cursor: pointer; font-weight: 600;
+  }
+  .auth-tab.active {
+    border-color: var(--neon-cyan); color: #fff; background: rgba(0, 243, 255, 0.1);
+  }
+  .form-group { margin-bottom: 14px; }
+  .form-group label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 6px; }
+  .form-group input {
+    width: 100%; padding: 11px 12px; background: var(--bg-panel);
+    border: 1px solid var(--border-subtle); border-radius: 8px; color: #fff; font-size: 14px;
+  }
+  .form-group input:focus { outline: none; border-color: var(--neon-cyan); }
+  .btn-primary {
+    width: 100%; padding: 12px; background: linear-gradient(90deg, var(--neon-cyan), var(--neon-green));
+    border: none; border-radius: 8px; color: #050811; font-weight: 800; font-size: 15px; cursor: pointer;
+  }
+  .auth-error { color: var(--neon-pink); font-size: 13px; margin-top: 10px; text-align: center; min-height: 18px; }
+
+  /* Основной интерфейс (статичные шапка и подвал) */
+  #appScreen { display: none; flex-direction: column; min-height: 100vh; }
+  header.top-bar {
+    position: relative;
+    background: var(--bg-card); border-bottom: 1px solid var(--border-subtle);
+    padding: 12px 16px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;
+  }
+  .brand-title { font-size: 20px; font-weight: 900; color: var(--neon-cyan); letter-spacing: 0.5px; }
+  .header-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .balance-pill {
+    background: var(--bg-panel); border: 1px solid var(--border-subtle);
+    padding: 7px 11px; border-radius: 8px; font-size: 13px; font-weight: 700;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .wallet-pill { border-color: rgba(185, 103, 255, 0.4); color: #e2c6ff; }
+  .main-bal-pill { border-color: rgba(5, 255, 161, 0.4); color: var(--neon-green); }
+
+  /* Кнопка 25 000 ₽ на месте пополнения */
+  .bonus-claim-btn {
+    background: linear-gradient(90deg, var(--neon-green), var(--neon-cyan));
+    color: #050811; border: none; padding: 8px 12px; border-radius: 8px;
+    font-weight: 800; font-size: 12px; cursor: pointer; white-space: nowrap;
+  }
+  .bonus-claim-btn:disabled {
+    background: var(--bg-panel); color: var(--text-muted); border: 1px solid var(--border-subtle); cursor: not-allowed;
+  }
+  .withdraw-btn, .notif-perm-btn {
+    background: var(--bg-panel); color: #fff; border: 1px solid var(--neon-purple);
+    padding: 7px 10px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer;
+  }
+  .notif-perm-btn { border-color: var(--neon-cyan); color: var(--neon-cyan); }
+
+  /* Профиль по нажатию на человечка */
+  .profile-wrapper { position: relative; }
+  .profile-icon-btn {
+    width: 36px; height: 36px; border-radius: 50%; background: var(--bg-panel);
+    border: 1px solid var(--neon-cyan); color: #fff; font-size: 17px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .profile-dropdown {
+    display: none; position: absolute; right: 0; top: 44px; width: 250px;
+    background: var(--bg-card); border: 1px solid var(--neon-cyan); border-radius: 12px;
+    padding: 14px; z-index: 500; box-shadow: 0 10px 25px rgba(0,0,0,0.6);
+  }
+  .profile-dropdown.open { display: block; }
+  .prof-row { font-size: 13px; margin-bottom: 8px; color: var(--text-muted); }
+  .prof-row strong { color: #fff; display: block; font-size: 14px; margin-top: 2px; }
+  .logout-btn {
+    width: 100%; margin-top: 8px; padding: 9px; background: rgba(255, 42, 109, 0.15);
+    border: 1px solid var(--neon-pink); color: var(--neon-pink); border-radius: 8px;
+    font-weight: 700; cursor: pointer;
+  }
+
+  /* Контейнер лиг и матчей */
+  main.content { flex: 1; max-width: 900px; width: 100%; margin: 0 auto; padding: 16px; }
+  .league-tabs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 16px; }
+  .league-tab {
+    background: var(--bg-card); border: 1px solid var(--border-subtle); color: var(--text-muted);
+    padding: 9px 14px; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer; white-space: nowrap;
+  }
+  .league-tab.active {
+    border-color: var(--neon-cyan); color: var(--neon-cyan); background: rgba(0, 243, 255, 0.08);
+  }
+
+  .match-card {
+    background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 12px;
+    padding: 14px; margin-bottom: 12px;
+  }
+  .match-header {
+    display: flex; justify-content: space-between; font-size: 12px; color: var(--text-muted); margin-bottom: 8px;
+  }
+  .match-teams { font-size: 16px; font-weight: 700; margin-bottom: 12px; }
+  .odds-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+  .odd-btn {
+    background: var(--bg-panel); border: 1px solid var(--border-subtle); border-radius: 8px;
+    padding: 9px 6px; color: #fff; cursor: pointer; text-align: center; transition: 0.15s;
+  }
+  .odd-btn span { display: block; font-size: 11px; color: var(--text-muted); }
+  .odd-btn strong { font-size: 14px; color: var(--neon-cyan); }
+  .odd-btn.selected {
+    border-color: var(--neon-green); background: rgba(5, 255, 161, 0.14);
+  }
+  .odd-btn.selected strong { color: var(--neon-green); }
+
+  /* Поле одиночной ставки прямо в карточке матча */
+  .single-bet-bar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    padding-top: 10px; border-top: 1px solid var(--border-subtle);
+  }
+  .single-bet-input {
+    width: 115px; padding: 8px 10px; background: var(--bg-panel);
+    border: 1px solid var(--border-subtle); border-radius: 8px; color: #fff; font-size: 13px;
+  }
+  .single-bet-input:focus { outline: none; border-color: var(--neon-cyan); }
+  .single-win-preview { font-size: 12px; color: var(--text-muted); flex: 1; min-width: 110px; }
+  .single-win-preview b { color: var(--neon-green); }
+  .single-sim-btn {
+    background: linear-gradient(90deg, var(--neon-cyan), var(--neon-purple));
+    border: none; border-radius: 8px; padding: 9px 14px; color: #050811;
+    font-weight: 800; font-size: 13px; cursor: pointer;
+  }
+  .single-sim-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* Нижний статичный блок экспресс-купона */
+  footer.express-footer {
+    position: relative;
+    background: var(--bg-card); border-top: 1px solid var(--neon-purple);
+    padding: 16px; margin-top: 20px;
+  }
+  .express-container { max-width: 900px; margin: 0 auto; }
+  .express-title { font-size: 16px; font-weight: 800; color: var(--neon-purple); margin-bottom: 10px; }
+  .express-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+  .express-item {
+    background: var(--bg-panel); padding: 8px 12px; border-radius: 8px;
+    display: flex; justify-content: space-between; align-items: center; font-size: 13px;
+  }
+  .express-remove { background: none; border: none; color: var(--neon-pink); cursor: pointer; font-weight: bold; }
+  .express-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .express-input {
+    width: 140px; padding: 10px; background: var(--bg-panel);
+    border: 1px solid var(--border-subtle); border-radius: 8px; color: #fff; font-size: 14px;
+  }
+  .express-summary { flex: 1; font-size: 13px; color: var(--text-muted); }
+  .express-summary b { color: var(--neon-green); }
+  .express-sim-btn {
+    background: linear-gradient(90deg, var(--neon-purple), var(--neon-pink));
+    border: none; border-radius: 8px; padding: 11px 18px; color: #fff;
+    font-weight: 800; font-size: 14px; cursor: pointer;
+  }
+  .express-sim-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .disclaimer {
+    text-align: center; font-size: 11px; color: var(--text-muted);
+    padding: 14px; max-width: 900px; margin: 0 auto;
+  }
+
+  /* Модальные окна (Касса и Live-трансляция) */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(4, 7, 15, 0.88);
+    backdrop-filter: blur(6px); display: none; align-items: center; justify-content: center;
+    z-index: 9999; padding: 16px;
+  }
+  .modal-box {
+    width: 100%; max-width: 520px; background: var(--bg-card);
+    border: 1px solid var(--neon-cyan); border-radius: 14px; padding: 20px;
+    box-shadow: 0 0 30px rgba(0, 243, 255, 0.25);
+  }
+  .modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+  .close-modal { background: none; border: none; color: var(--text-muted); font-size: 20px; cursor: pointer; }
+
+  /* Live матч */
+  .live-badge { color: var(--neon-pink); font-weight: 800; font-size: 13px; display: flex; align-items: center; gap: 6px; }
+  .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--neon-pink); animation: pulse 1s infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
+  .scoreboard {
+    display: flex; justify-content: space-between; align-items: center;
+    background: var(--bg-panel); padding: 14px; border-radius: 10px; margin-bottom: 12px;
+  }
+  .sb-team { width: 35%; text-align: center; font-weight: 700; font-size: 15px; }
+  .sb-center { text-align: center; }
+  .sb-score { font-size: 30px; font-weight: 900; color: var(--neon-cyan); }
+  .sb-min { font-size: 13px; font-weight: 700; color: var(--neon-green); }
+  .live-ticker {
+    text-align: center; padding: 8px; background: rgba(0, 243, 255, 0.08);
+    border-radius: 8px; font-size: 13px; margin-bottom: 14px;
+  }
+  .tl-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); margin-bottom: 5px; }
+  .tl-bar { position: relative; height: 6px; background: #1e294b; border-radius: 3px; margin-bottom: 14px; }
+  .tl-progress { height: 100%; width: 0%; background: linear-gradient(90deg, var(--neon-cyan), var(--neon-purple)); border-radius: 3px; }
+  .tl-marker {
+    position: absolute; top: 50%; transform: translate(-50%, -50%);
+    width: 11px; height: 11px; border-radius: 50%; border: 1px solid var(--bg-card);
+  }
+  .tl-marker.goal { background: var(--neon-green); box-shadow: 0 0 6px var(--neon-green); }
+  .tl-marker.yellow { background: var(--neon-yellow); }
+  .tl-marker.red { background: var(--neon-pink); box-shadow: 0 0 6px var(--neon-pink); }
+  .tl-marker.whistle { background: #fff; width: 7px; height: 7px; }
+  .live-log {
+    max-height: 115px; overflow-y: auto; font-size: 12px; display: flex; flex-direction: column; gap: 5px;
+    border-top: 1px solid var(--border-subtle); padding-top: 8px;
+  }
+  .log-row { display: flex; justify-content: space-between; color: #cbd5e1; }
+</style>
+</head>
+<body>
+
+<!-- Контейнер всплывающих уведомлений -->
+<div id="nbPushContainer"></div>
+
+<!-- ЭКРАН АВТОРИЗАЦИИ -->
+<div id="authScreen">
+  <div class="auth-box">
+    <div class="logo">NEON BET</div>
+    <div class="auth-sub">Развлекательный симулятор спортивных ставок</div>
+    <div class="auth-tabs">
+      <button type="button" class="auth-tab active" id="tabReg" onclick="switchAuthTab('reg')">Регистрация</button>
+      <button type="button" class="auth-tab" id="tabLogin" onclick="switchAuthTab('login')">Вход</button>
+    </div>
+    <form id="authForm" onsubmit="handleAuthSubmit(event)">
+      <div class="form-group">
+        <label>Никнейм игрока</label>
+        <input type="text" id="authNick" placeholder="Введите никнейм" required>
+      </div>
+      <div class="form-group">
+        <label>Пароль</label>
+        <input type="password" id="authPass" placeholder="Введите пароль" required>
+      </div>
+      <div class="form-group" id="cardGroup">
+        <label>Виртуальная карта (любые 16 цифр)</label>
+        <input type="text" id="authCard" maxlength="19" placeholder="0000 0000 0000 0000" oninput="formatCardInput(this)">
+      </div>
+      <button type="submit" class="btn-primary" id="authSubmitBtn">Создать аккаунт (+15 000 ₽)</button>
+      <div class="auth-error" id="authError"></div>
+    </form>
+  </div>
+</div>
+
+<!-- ОСНОВНОЙ ИНТЕРФЕЙС -->
+<div id="appScreen">
+  <header class="top-bar">
+    <div class="brand-title">NEON BET</div>
+    <div class="header-controls">
+      <div class="balance-pill wallet-pill">👛 Кошелёк: <span id="walletAmount">0</span> ₽</div>
+      <div class="balance-pill main-bal-pill">💰 Баланс: <span id="balanceAmount">0</span> ₽</div>
+      <button type="button" id="dailyBonusBtn" class="bonus-claim-btn" onclick="claimDailyBonus()">🎁 Забрать 25 000 ₽</button>
+      <button type="button" class="withdraw-btn" onclick="openWithdrawModal()">Вывести</button>
+      <button type="button" class="notif-perm-btn" id="notifPermBtn" onclick="requestSystemNotifications()" title="Включить системные уведомления">🔔</button>
+
+      <div class="profile-wrapper">
+        <button type="button" class="profile-icon-btn" onclick="toggleProfileMenu()" title="Профиль">👤</button>
+        <div class="profile-dropdown" id="profileDropdown">
+          <div class="prof-row">Игрок:<strong id="profNick">-</strong></div>
+          <div class="prof-row">Привязанная карта:<strong id="profCard">**** **** **** ****</strong></div>
+          <div class="prof-row">В кошельке:<strong id="profWallet">0 ₽</strong></div>
+          <button type="button" class="logout-btn" onclick="logoutUser()">Выйти из аккаунта</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="content">
+    <div class="league-tabs" id="leagueTabs"></div>
+    <div id="matchesList"></div>
+  </main>
+
+  <footer class="express-footer">
+    <div class="express-container">
+      <div class="express-title">⚡ Экспресс-купон (от 2 событий)</div>
+      <div class="express-list" id="expressList"></div>
+      <div class="express-controls">
+        <input type="number" id="expressStakeInput" class="express-input" placeholder="Сумма ₽" min="10" oninput="updateExpressSummary()">
+        <div class="express-summary" id="expressSummary">Выберите от 2 исходов в матчах выше</div>
+        <button type="button" id="expressSimBtn" class="express-sim-btn" disabled onclick="startExpressSimulation()">Симулировать экспресс</button>
+      </div>
+    </div>
+  </footer>
+
+  <div class="disclaimer">
+    Данный сайт является исключительно развлекательным игровым симулятором. Все денежные единицы вымышлены, реальные ставки не принимаются, выплаты не осуществляются.
+  </div>
+</div>
+
+<!-- МОДАЛКА ВЫВОДА В КОШЕЛЁК -->
+<div class="modal-overlay" id="withdrawModal">
+  <div class="modal-box" style="max-width: 380px;">
+    <div class="modal-head">
+      <strong>Вывод средств в кошелёк</strong>
+      <button type="button" class="close-modal" onclick="closeWithdrawModal()">✕</button>
+    </div>
+    <div class="form-group">
+      <label>Сумма перевода (суточный лимит 50 000 ₽)</label>
+      <input type="number" id="withdrawInput" placeholder="Введите сумму ₽" min="1">
+    </div>
+    <button type="button" class="btn-primary" onclick="processWithdraw()">Перевести в кошелёк</button>
+  </div>
+</div>
+
+<!-- МОДАЛКА LIVE-СИМУЛЯЦИИ МАТЧА -->
+<div class="modal-overlay" id="liveModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <span class="live-badge"><span class="live-dot"></span> LIVE СИМУЛЯЦИЯ</span>
+      <span id="liveCounter" style="font-size: 12px; color: var(--text-muted);">Матч 1 из 1</span>
+      <button type="button" class="close-modal" id="liveCloseBtn" disabled onclick="closeLiveModal()">✕</button>
+    </div>
+    <div class="scoreboard">
+      <div class="sb-team" id="liveHomeName">Команда 1</div>
+      <div class="sb-center">
+        <div class="sb-score"><span id="liveHomeScore">0</span> : <span id="liveAwayScore">0</span></div>
+        <div class="sb-min" id="liveMinute">0'</div>
+      </div>
+      <div class="sb-team" id="liveAwayName">Команда 2</div>
+    </div>
+    <div class="live-ticker" id="liveTicker">Стартовый свисток! Матч начался</div>
+    <div class="tl-labels"><span>0' (Начало)</span><span>45'</span><span>90' (Конец)</span></div>
+    <div class="tl-bar">
+      <div class="tl-progress" id="liveProgress"></div>
+      <div id="liveMarkers"></div>
+    </div>
+    <div class="live-log" id="liveLog"></div>
+    <button type="button" class="btn-primary" id="liveFinishBtn" style="display:none; margin-top:14px;" onclick="closeLiveModal()">Завершить</button>
+  </div>
+</div>
+
+<script>
+const LEAGUES_POOL = {
+  "АПЛ": ["Арсенал", "Ливерпуль", "Манчестер Сити", "Челси", "Тоттенхэм", "Манчестер Юнайтед", "Ньюкасл", "Астон Вилла", "Брайтон", "Вест Хэм", "Фулхэм", "Брентфорд"],
+  "РПЛ": ["Зенит", "Спартак Москва", "Краснодар", "ЦСКА Москва", "Динамо Москва", "Локомотив Москва", "Ростов", "Рубин", "Крылья Советов", "Ахмат", "Урал", "Оренбург"],
+  "Ла Лига": ["Реал Мадрид", "Барселона", "Атлетико Мадрид", "Атлетик Бильбао", "Реал Сосьедад", "Вильярреал", "Бетис", "Севилья", "Жирона", "Валенсия", "Осасуна", "Сельта"],
+  "Лига Чемпионов": ["Бавария", "ПСЖ", "Интер", "Боруссия Дортмунд", "Милан", "Байер Леверкузен", "Ювентус", "Бенфика", "РБ Лейпциг", "Спортинг", "Аталанта", "ПСВ"],
+  "Кубок Наций": ["Испания", "Франция", "Германия", "Нидерланды", "Португалия", "Италия", "Англия", "Хорватия", "Бельгия", "Дания", "Швейцария", "Австрия"]
+};
+
+let authMode = 'reg';
+let currentUser = null;
+let activeLeague = "АПЛ";
+let expressCoupon = [];
+let singleStakes = {};
+let bonusInterval = null;
+
+function getUsersDB() {
+  try { return JSON.parse(localStorage.getItem('neonbet_users_v12') || '{}'); }
+  catch (e) { return {}; }
+}
+function saveUsersDB(db) {
+  localStorage.setItem('neonbet_users_v12', JSON.stringify(db));
+}
+function saveCurrentUser() {
+  if (!currentUser) return;
+  const db = getUsersDB();
+  db[currentUser.nick] = currentUser;
+  saveUsersDB(db);
+  localStorage.setItem('neonbet_active_nick_v12', currentUser.nick);
+}
+
+// Уведомления (всплывающие мобильные плашки + системные Notifications API)
+function requestSystemNotifications() {
+  if (!("Notification" in window)) {
+    showPushNotification("info", "Уведомления", "Включены встроенные push-уведомления на экране.");
+    return;
+  }
+  Notification.requestPermission().then(perm => {
+    if (perm === "granted") {
+      showPushNotification("win", "Уведомления активны", "Теперь результаты ставок будут приходить и в шторку телефона!");
+    } else {
+      showPushNotification("info", "Встроенный режим", "Системные уведомления отклонены. Показываем баннеры на экране.");
+    }
+  });
+}
+
+function showPushNotification(type, title, body) {
+  // 1. Всплывающий баннер сверху экрана (работает всегда и везде)
+  const container = document.getElementById('nbPushContainer');
+  const toast = document.createElement('div');
+  toast.className = `nb-push-toast ${type}`;
+  const icon = type === 'win' ? '🏆' : (type === 'loss' ? '📉' : '🔔');
+  toast.innerHTML = `
+    <div class="nb-push-icon">${icon}</div>
+    <div class="nb-push-content">
+      <div class="nb-push-app"><span>NEON BET</span><span>Сейчас</span></div>
+      <div class="nb-push-title">${title}</div>
+      <div class="nb-push-body">${body}</div>
+    </div>
+  `;
+  toast.onclick = () => toast.remove();
+  container.appendChild(toast);
+
+  setTimeout(() => {
+    toast.style.animation = 'fadeOutPush 0.35s forwards';
+    setTimeout(() => toast.remove(), 350);
+  }, 5500);
+
+  // 2. Системное уведомление в шторку телефона (если разрешено и поддерживается)
+  if ("Notification" in window && Notification.permission === "granted") {
+    try {
+      new Notification(title, { body: body });
+    } catch (e) {}
+  }
+}
+
+// Генерация 5 матчей для лиги
+function generateLeagueMatches(leagueName) {
+  const teams = [...LEAGUES_POOL[leagueName]].sort(() => Math.random() - 0.5);
+  const matches = [];
+  for (let i = 0; i < 5; i++) {
+    const home = teams[i * 2];
+    const away = teams[i * 2 + 1];
+    const p1 = +(1.55 + Math.random() * 2.1).toFixed(2);
+    const x = +(2.95 + Math.random() * 1.1).toFixed(2);
+    const p2 = +(1.65 + Math.random() * 2.3).toFixed(2);
+    matches.push({
+      id: `${leagueName}_${Date.now()}_${i}_${Math.random().toString(36).slice(2,6)}`,
+      league: leagueName,
+      home, away,
+      odds: { "П1": p1, "Х": x, "П2": p2 }
+    });
+  }
+  return matches;
+}
+
+function generateAllLeagues() {
+  const data = {};
+  Object.keys(LEAGUES_POOL).forEach(l => { data[l] = generateLeagueMatches(l); });
+  return data;
+}
+
+// Авторизация
+function switchAuthTab(mode) {
+  authMode = mode;
+  document.getElementById('tabReg').classList.toggle('active', mode === 'reg');
+  document.getElementById('tabLogin').classList.toggle('active', mode === 'login');
+  document.getElementById('cardGroup').style.display = mode === 'reg' ? 'block' : 'none';
+  document.getElementById('authSubmitBtn').textContent = mode === 'reg' ? 'Создать аккаунт (+15 000 ₽)' : 'Войти в аккаунт';
+  document.getElementById('authError').textContent = '';
+}
+
+function formatCardInput(input) {
+  let digits = input.value.replace(/\D/g, '').slice(0, 16);
+  input.value = digits.replace(/(.{4})/g, '$1 ').trim();
+}
+
+function handleAuthSubmit(e) {
+  e.preventDefault();
+  const nick = document.getElementById('authNick').value.trim();
+  const pass = document.getElementById('authPass').value.trim();
+  const errEl = document.getElementById('authError');
+  const db = getUsersDB();
+
+  if (!nick || !pass) { errEl.textContent = 'Заполните никнейм и пароль'; return; }
+
+  if (authMode === 'reg') {
+    if (db[nick]) { errEl.textContent = 'Этот никнейм уже занят'; return; }
+    const cardDigits = document.getElementById('authCard').value.replace(/\D/g, '');
+    if (cardDigits.length !== 16) { errEl.textContent = 'Введите 16 цифр вымышленной карты'; return; }
+
+    currentUser = {
+      nick, pass,
+      card: cardDigits,
+      balance: 15000,
+      wallet: 0,
+      nextBonusAt: 0,
+      withdrawnToday: 0,
+      lastWithdrawDate: new Date().toDateString(),
+      leagues: generateAllLeagues()
+    };
+    saveCurrentUser();
+    enterApp();
+  } else {
+    const user = db[nick];
+    if (!user || user.pass !== pass) {
+      errEl.textContent = 'Неверный никнейм или пароль';
+      return;
+    }
+    if (!user.leagues) user.leagues = generateAllLeagues();
+    currentUser = user;
+    saveCurrentUser();
+    enterApp();
+  }
+}
+
+function enterApp() {
+  document.getElementById('authScreen').style.display = 'none';
+  document.getElementById('appScreen').style.display = 'flex';
+  updateHeaderUI();
+  renderLeagueTabs();
+  renderMatches();
+  renderExpressCoupon();
+  startBonusTimerLoop();
+}
+
+function logoutUser() {
+  localStorage.removeItem('neonbet_active_nick_v12');
+  currentUser = null;
+  expressCoupon = [];
+  document.getElementById('profileDropdown').classList.remove('open');
+  document.getElementById('appScreen').style.display = 'none';
+  document.getElementById('authScreen').style.display = 'flex';
+}
+
+function toggleProfileMenu() {
+  document.getElementById('profileDropdown').classList.toggle('open');
+}
+
+function updateHeaderUI() {
+  if (!currentUser) return;
+  document.getElementById('balanceAmount').textContent = currentUser.balance.toLocaleString('ru-RU');
+  document.getElementById('walletAmount').textContent = currentUser.wallet.toLocaleString('ru-RU');
+  document.getElementById('profNick').textContent = currentUser.nick;
+  const last4 = (currentUser.card || '0000').slice(-4);
+  document.getElementById('profCard').textContent = `**** **** **** ${last4}`;
+  document.getElementById('profWallet').textContent = `${currentUser.wallet.toLocaleString('ru-RU')} ₽`;
+}
+
+// Ежедневный бонус 25 000 ₽ (таймер 24 часа)
+function claimDailyBonus() {
+  const now = Date.now();
+  if (currentUser.nextBonusAt && now < currentUser.nextBonusAt) return;
+  currentUser.balance += 25000;
+  currentUser.nextBonusAt = now + 24 * 60 * 60 * 1000;
+  saveCurrentUser();
+  updateHeaderUI();
+  updateBonusButton();
+  showPushNotification("win", "Бонус получен! +25 000 ₽", "Ежедневное пополнение зачислено на ваш игровой баланс.");
+}
+
+function updateBonusButton() {
+  if (!currentUser) return;
+  const btn = document.getElementById('dailyBonusBtn');
+  const now = Date.now();
+  if (!currentUser.nextBonusAt || now >= currentUser.nextBonusAt) {
+    btn.disabled = false;
+    btn.textContent = '🎁 Забрать 25 000 ₽';
+  } else {
+    btn.disabled = true;
+    const diff = Math.max(0, currentUser.nextBonusAt - now);
+    const h = String(Math.floor(diff / 3600000)).padStart(2, '0');
+    const m = String(Math.floor((diff % 3600000) / 60000)).padStart(2, '0');
+    const s = String(Math.floor((diff % 60000) / 1000)).padStart(2, '0');
+    btn.textContent = `⏳ ${h}:${m}:${s}`;
+  }
+}
+
+function startBonusTimerLoop() {
+  if (bonusInterval) clearInterval(bonusInterval);
+  updateBonusButton();
+  bonusInterval = setInterval(updateBonusButton, 1000);
+}
+
+// Вывод в кошелёк
+function openWithdrawModal() {
+  document.getElementById('withdrawInput').value = '';
+  document.getElementById('withdrawModal').style.display = 'flex';
+}
+function closeWithdrawModal() {
+  document.getElementById('withdrawModal').style.display = 'none';
+}
+function processWithdraw() {
+  const sum = Math.floor(Number(document.getElementById('withdrawInput').value));
+  if (!sum || sum <= 0) { alert('Введите корректную сумму'); return; }
+  if (sum > currentUser.balance) { alert('Недостаточно средств на игровом балансе'); return; }
+
+  const today = new Date().toDateString();
+  if (currentUser.lastWithdrawDate !== today) {
+    currentUser.lastWithdrawDate = today;
+    currentUser.withdrawnToday = 0;
+  }
+  if (currentUser.withdrawnToday + sum > 50000) {
+    alert(`Превышен суточный лимит вывода (осталось ${50000 - currentUser.withdrawnToday} ₽)`);
+    return;
+  }
+
+  currentUser.balance -= sum;
+  currentUser.wallet += sum;
+  currentUser.withdrawnToday += sum;
+  saveCurrentUser();
+  updateHeaderUI();
+  closeWithdrawModal();
+  showPushNotification("info", "Перевод в кошелёк", `${sum.toLocaleString('ru-RU')} ₽ успешно переведены в ваш виртуальный кошелёк.`);
+}
+
+// Отрисовка лиг и матчей
+function renderLeagueTabs() {
+  const box = document.getElementById('leagueTabs');
+  box.innerHTML = '';
+  Object.keys(LEAGUES_POOL).forEach(league => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `league-tab ${league === activeLeague ? 'active' : ''}`;
+    btn.textContent = league;
+    btn.onclick = () => { activeLeague = league; renderLeagueTabs(); renderMatches(); };
+    box.appendChild(btn);
+  });
+}
+
+function renderMatches() {
+  const list = document.getElementById('matchesList');
+  list.innerHTML = '';
+  const matches = currentUser.leagues[activeLeague] || [];
+
+  matches.forEach(m => {
+    const selectedPick = expressCoupon.find(item => item.matchId === m.id)?.pick || null;
+    const savedStake = singleStakes[m.id] || '';
+    const oddVal = selectedPick ? m.odds[selectedPick] : 0;
+    const winPreview = (savedStake && oddVal) ? Math.round(savedStake * oddVal) : 0;
+
+    const card = document.createElement('div');
+    card.className = 'match-card';
+    card.innerHTML = `
+      <div class="match-header"><span>${m.league}</span><span>LIVE-симуляция 90'</span></div>
+      <div class="match-teams">${m.home} — ${m.away}</div>
+      <div class="odds-row">
+        ${['П1', 'Х', 'П2'].map(pick => `
+          <button type="button" class="odd-btn ${selectedPick === pick ? 'selected' : ''}"
+            onclick="selectOdd('${m.id}', '${pick}')">
+            <span>${pick}</span>
+            <strong>${m.odds[pick].toFixed(2)}</strong>
+          </button>
+        `).join('')}
+      </div>
+      <div class="single-bet-bar">
+        <input type="number" class="single-bet-input" placeholder="Ставка ₽" min="10"
+          value="${savedStake}" oninput="handleSingleStakeInput('${m.id}', this.value)">
+        <div class="single-win-preview" id="win_prev_${m.id}">
+          ${selectedPick ? `Выигрыш: <b>${winPreview} ₽</b>` : 'Выберите исход'}
+        </div>
+        <button type="button" class="single-sim-btn" id="sim_btn_${m.id}"
+          ${(!selectedPick || !savedStake || savedStake <= 0) ? 'disabled' : ''}
+          onclick="startSingleSimulation('${m.id}')">Симулировать матч</button>
+      </div>
+    `;
+    list.appendChild(card);
+  });
+}
+
+function selectOdd(matchId, pick) {
+  const match = currentUser.leagues[activeLeague].find(m => m.id === matchId);
+  if (!match) return;
+
+  const existingIdx = expressCoupon.findIndex(item => item.matchId === matchId);
+  if (existingIdx >= 0) {
+    if (expressCoupon[existingIdx].pick === pick) {
+      expressCoupon.splice(existingIdx, 1);
+    } else {
+      expressCoupon[existingIdx].pick = pick;
+      expressCoupon[existingIdx].odd = match.odds[pick];
+    }
+  } else {
+    expressCoupon.push({
+      matchId: match.id,
+      league: match.league,
+      home: match.home,
+      away: match.away,
+      pick,
+      odd: match.odds[pick]
+    });
+  }
+  renderMatches();
+  renderExpressCoupon();
+}
+
+function handleSingleStakeInput(matchId, val) {
+  const num = Number(val);
+  singleStakes[matchId] = val;
+  const selected = expressCoupon.find(item => item.matchId === matchId);
+  const prevEl = document.getElementById(`win_prev_${matchId}`);
+  const btnEl = document.getElementById(`sim_btn_${matchId}`);
+
+  if (selected && num > 0) {
+    const win = Math.round(num * selected.odd);
+    if (prevEl) prevEl.innerHTML = `Выигрыш: <b>${win.toLocaleString('ru-RU')} ₽</b>`;
+    if (btnEl) btnEl.disabled = false;
+  } else {
+    if (prevEl) prevEl.innerHTML = selected ? 'Выигрыш: <b>0 ₽</b>' : 'Выберите исход';
+    if (btnEl) btnEl.disabled = true;
+  }
+}
+
+// Экспресс-купон
+function renderExpressCoupon() {
+  const listEl = document.getElementById('expressList');
+  listEl.innerHTML = '';
+  expressCoupon.forEach((item, idx) => {
+    const row = document.createElement('div');
+    row.className = 'express-item';
+    row.innerHTML = `
+      <span>${item.home} — ${item.away} (<b>${item.pick}</b> @ ${item.odd.toFixed(2)})</span>
+      <button type="button" class="express-remove" onclick="removeExpressItem(${idx})">✕</button>
+    `;
+    listEl.appendChild(row);
+  });
+  updateExpressSummary();
+}
+
+function removeExpressItem(idx) {
+  expressCoupon.splice(idx, 1);
+  renderMatches();
+  renderExpressCoupon();
+}
+
+function updateExpressSummary() {
+  const sumEl = document.getElementById('expressSummary');
+  const btnEl = document.getElementById('expressSimBtn');
+  const stake = Number(document.getElementById('expressStakeInput').value);
+
+  if (expressCoupon.length < 2) {
+    sumEl.textContent = `В купоне событий: ${expressCoupon.length} (нужно минимум 2)`;
+    btnEl.disabled = true;
+    return;
+  }
+  const totalOdd = expressCoupon.reduce((acc, item) => acc * item.odd, 1);
+  const potential = stake > 0 ? Math.round(stake * totalOdd) : 0;
+  sumEl.innerHTML = `Коэф: <b>${totalOdd.toFixed(2)}</b> | Возможный выигрыш: <b>${potential.toLocaleString('ru-RU')} ₽</b>`;
+  btnEl.disabled = !(stake > 0);
+}
+
+// Генерация счёта и симуляция матча
+function generateMatchOutcome(home, away) {
+  const hGoals = Math.floor(Math.random() * 4);
+  const aGoals = Math.floor(Math.random() * 4);
+  const result = hGoals > aGoals ? 'П1' : (hGoals < aGoals ? 'П2' : 'Х');
+  return { home, away, finalHome: hGoals, finalAway: aGoals, result };
+}
+
+function startSingleSimulation(matchId) {
+  const stake = Math.floor(Number(singleStakes[matchId]));
+  const pickItem = expressCoupon.find(item => item.matchId === matchId);
+  if (!pickItem || stake <= 0) return;
+  if (stake > currentUser.balance) { alert('Недостаточно средств на балансе'); return; }
+
+  currentUser.balance -= stake;
+  saveCurrentUser();
+  updateHeaderUI();
+
+  const simMatch = generateMatchOutcome(pickItem.home, pickItem.away);
+  const isWin = simMatch.result === pickItem.pick;
+  const winAmount = isWin ? Math.round(stake * pickItem.odd) : 0;
+
+  runLivePlayer([simMatch], () => {
+    if (isWin) {
+      currentUser.balance += winAmount;
+      showPushNotification(
+        "win",
+        `Выигрыш +${winAmount.toLocaleString('ru-RU')} ₽!`,
+        `Ставка сыграла: ${simMatch.home} ${simMatch.finalHome}:${simMatch.finalAway} ${simMatch.away} (${pickItem.pick}).`
+      );
+    } else {
+      showPushNotification(
+        "loss",
+        `Ставка проиграла (-${stake.toLocaleString('ru-RU')} ₽)`,
+        `Итог матча: ${simMatch.home} ${simMatch.finalHome}:${simMatch.finalAway} ${simMatch.away}. Ваш прогноз: ${pickItem.pick}.`
+      );
+    }
+
+    // Обновляем матчи в сыгранной лиге
+    currentUser.leagues[pickItem.league] = generateLeagueMatches(pickItem.league);
+    expressCoupon = expressCoupon.filter(i => i.league !== pickItem.league);
+    delete singleStakes[matchId];
+    saveCurrentUser();
+    updateHeaderUI();
+    renderMatches();
+    renderExpressCoupon();
+  });
+}
+
+function startExpressSimulation() {
+  const stake = Math.floor(Number(document.getElementById('expressStakeInput').value));
+  if (expressCoupon.length < 2 || stake <= 0) return;
+  if (stake > currentUser.balance) { alert('Недостаточно средств на балансе'); return; }
+
+  currentUser.balance -= stake;
+  saveCurrentUser();
+  updateHeaderUI();
+
+  const itemsSnapshot = [...expressCoupon];
+  const simMatches = itemsSnapshot.map(item => {
+    const out = generateMatchOutcome(item.home, item.away);
+    return { ...out, userPick: item.pick, league: item.league };
+  });
+
+  const allWon = simMatches.every(m => m.result === m.userPick);
+  const totalOdd = itemsSnapshot.reduce((acc, i) => acc * i.odd, 1);
+  const winAmount = allWon ? Math.round(stake * totalOdd) : 0;
+
+  runLivePlayer(simMatches, () => {
+    if (allWon) {
+      currentUser.balance += winAmount;
+      showPushNotification(
+        "win",
+        `Экспресс зашёл! +${winAmount.toLocaleString('ru-RU')} ₽`,
+        `Все ${simMatches.length} событий угаданы (общий коэф. ${totalOdd.toFixed(2)}).`
+      );
+    } else {
+      const failed = simMatches.find(m => m.result !== m.userPick);
+      showPushNotification(
+        "loss",
+        `Экспресс проиграл (-${stake.toLocaleString('ru-RU')} ₽)`,
+        `Не сыграл матч ${failed.home} ${failed.finalHome}:${failed.finalAway} ${failed.away} (прогноз: ${failed.userPick}).`
+      );
+    }
+
+    // Обновляем все лиги, участвовавшие в экспрессе
+    const touchedLeagues = new Set(itemsSnapshot.map(i => i.league));
+    touchedLeagues.forEach(l => { currentUser.leagues[l] = generateLeagueMatches(l); });
+    expressCoupon = [];
+    document.getElementById('expressStakeInput').value = '';
+    saveCurrentUser();
+    updateHeaderUI();
+    renderMatches();
+    renderExpressCoupon();
+  });
+}
+
+// Ускоренный плеер live-матча (10 сек = 90 мин)
+function runLivePlayer(matches, onFinishCallback) {
+  const modal = document.getElementById('liveModal');
+  const closeBtn = document.getElementById('liveCloseBtn');
+  const finishBtn = document.getElementById('liveFinishBtn');
+  modal.style.display = 'flex';
+  closeBtn.disabled = true;
+  finishBtn.style.display = 'none';
+
+  let idx = 0;
+
+  function playOne(m) {
+    document.getElementById('liveCounter').textContent = `Матч ${idx + 1} из ${matches.length}`;
+    document.getElementById('liveHomeName').textContent = m.home;
+    document.getElementById('liveAwayName').textContent = m.away;
+    document.getElementById('liveHomeScore').textContent = '0';
+    document.getElementById('liveAwayScore').textContent = '0';
+    document.getElementById('liveMinute').textContent = "0'";
+    document.getElementById('liveProgress').style.width = '0%';
+    document.getElementById('liveLog').innerHTML = '';
+
+    const markersBox = document.getElementById('liveMarkers');
+    markersBox.innerHTML = `
+      <div class="tl-marker whistle" style="left:0%" title="0' Начало матча"></div>
+      <div class="tl-marker whistle" style="left:100%" title="90' Конец матча"></div>
+    `;
+
+    const events = [];
+    for (let i = 0; i < m.finalHome; i++) {
+      events.push({ min: Math.floor(Math.random() * 87) + 2, type: 'goal', side: 'home', text: `⚽ ГОЛ! ${m.home}` });
+    }
+    for (let i = 0; i < m.finalAway; i++) {
+      events.push({ min: Math.floor(Math.random() * 87) + 2, type: 'goal', side: 'away', text: `⚽ ГОЛ! ${m.away}` });
+    }
+    const cards = Math.floor(Math.random() * 3) + 1;
+    for (let i = 0; i < cards; i++) {
+      const isRed = Math.random() < 0.22;
+      const team = Math.random() < 0.5 ? m.home : m.away;
+      events.push({
+        min: Math.floor(Math.random() * 87) + 2,
+        type: isRed ? 'red' : 'yellow',
+        text: `${isRed ? '🟥 Красная' : '🟨 Жёлтая'} карточка (${team})`
+      });
+    }
+    events.sort((a, b) => a.min - b.min);
+
+    let hScore = 0, aScore = 0;
+    const duration = 10000;
+    const start = performance.now();
+    appendLiveLog("0'", "🏁 Начало матча");
+
+    function step(now) {
+      const progress = Math.min((now - start) / duration, 1);
+      const curMin = Math.floor(progress * 90);
+      document.getElementById('liveMinute').textContent = `${curMin}'`;
+      document.getElementById('liveProgress').style.width = `${progress * 100}%`;
+
+      events.forEach(ev => {
+        if (!ev.done && curMin >= ev.min) {
+          ev.done = true;
+          if (ev.type === 'goal') {
+            ev.side === 'home' ? hScore++ : aScore++;
+            document.getElementById('liveHomeScore').textContent = hScore;
+            document.getElementById('liveAwayScore').textContent = aScore;
+          }
+          document.getElementById('liveTicker').textContent = `${ev.min}' — ${ev.text}`;
+          appendLiveLog(`${ev.min}'`, ev.text);
+
+          const dot = document.createElement('div');
+          dot.className = `tl-marker ${ev.type}`;
+          dot.style.left = `${(ev.min / 90) * 100}%`;
+          dot.title = `${ev.min}' ${ev.text}`;
+          markersBox.appendChild(dot);
+        }
+      });
+
+      if (progress < 1) {
+        requestAnimationFrame(step);
+      } else {
+        document.getElementById('liveTicker').textContent = "🏁 Финальный свисток! Матч окончен";
+        appendLiveLog("90'", "🏁 Конец матча");
+        if (idx + 1 < matches.length) {
+          idx++;
+          setTimeout(() => playOne(matches[idx]), 1100);
+        } else {
+          closeBtn.disabled = false;
+          finishBtn.style.display = 'block';
+          finishBtn.onclick = () => {
+            modal.style.display = 'none';
+            if (onFinishCallback) onFinishCallback();
+          };
+          closeBtn.onclick = () => {
+            modal.style.display = 'none';
+            if (onFinishCallback) onFinishCallback();
+          };
+        }
+      }
+    }
+    requestAnimationFrame(step);
+  }
+
+  function appendLiveLog(min, text) {
+    const log = document.getElementById('liveLog');
+    const row = document.createElement('div');
+    row.className = 'log-row';
+    row.innerHTML = `<span>${text}</span><strong>${min}</strong>`;
+    log.prepend(row);
+  }
+
+  playOne(matches[0]);
+}
+
+function closeLiveModal() {
+  document.getElementById('liveModal').style.display = 'none';
+}
+
+// Автоматический вход при перезагрузке страницы
+window.addEventListener('DOMContentLoaded', () => {
+  const activeNick = localStorage.getItem('neonbet_active_nick_v12');
+  if (activeNick) {
+    const db = getUsersDB();
+    if (db[activeNick]) {
+      currentUser = db[activeNick];
+      if (!currentUser.leagues) currentUser.leagues = generateAllLeagues();
+      enterApp();
+    }
+  }
+});
+</script>
+</body>
+</html>
